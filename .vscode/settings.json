@@ -1,0 +1,32 @@
+{
+    "python.analysis.typeCheckingMode": "strict",
+    "python.analysis.diagnosticMode": "workspace",
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.importFormat": "absolute",
+    "python.analysis.inlayHints.functionReturnTypes": true,
+    "python.analysis.inlayHints.variableTypes": true,
+    "python.analysis.packageIndexDepths": [
+        {
+            "name": "fastapi",
+            "depth": 2
+        },
+        {
+            "name": "pydantic",
+            "depth": 2
+        }
+    ],
+    "python.languageServer": "Pylance",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/pagila_api"
+    ],
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportUnknownMemberType": "none",
+        "reportUnknownVariableType": "none"
+    },
+    "python.analysis.autoSearchPaths": true,
+    "python.analysis.indexing": true,
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit"
+    }
+}

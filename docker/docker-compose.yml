@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: pagila
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts:/scripts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/pagila
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DEBUG: ${DEBUG:-true}
+      AUTH_TOKEN: ${AUTH_TOKEN:-dvd_admin}
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+    env_file:
+      - ../.env.local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../:/app
+    command: >
+      sh -c "
+        echo '🔄 Waiting for PostgreSQL to be ready...' &&
+        until pg_isready -h postgres -p 5432 -U postgres; do
+          echo 'PostgreSQL is unavailable - sleeping'
+          sleep 1
+        done &&
+        echo '✅ PostgreSQL is ready!' &&
+        echo '📊 Running database migrations...' &&
+        poetry run alembic upgrade head &&
+        echo '🌱 Loading sample data...' &&
+        if psql postgresql://postgres:postgres@postgres:5432/pagila -c 'SELECT COUNT(*) FROM film;' | grep -q ' 0$'; then
+          echo '📥 Loading sample data from scripts/pagila-data.sql...'
+          psql postgresql://postgres:postgres@postgres:5432/pagila < scripts/pagila-data.sql
+          echo '✅ Sample data loaded successfully!'
+        else
+          echo '✅ Sample data already exists, skipping...'
+        fi &&
+        echo '🚀 Starting FastAPI application...' &&
+        poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+
+volumes:
+  postgres_data:

@@ -1,0 +1,13 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Always browse the web before choosing a library to do a task. Make sure you use the latest version and practice
+If you do not know about a library or have latest information about a subject , search online to always get the latest information and refer docs
+Always use Autogen 0.4+ preferebly 0.4.7 or above, never use Autogen 0.2 or PyAutogen
+Always use Pydantic Logfire 3.9.0 or greater for logging and observability
+Do not using any other library like LangGraph, CrewAI, Pydantic AI even if they are in the codebase as sample code. Always use Autogen 0.4+
+Always use Pyproject.toml to manage dependencies
+We are using make setup command to setup the project and install dependencies and make cleanup to do the cleanup of depencies.
+Always use the best industry standards when working on a task.
