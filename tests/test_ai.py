@@ -1,12 +1,8 @@
 """Test AI endpoints."""
 
 import pytest
-import json
 from httpx import AsyncClient
 from unittest.mock import AsyncMock, patch, MagicMock
-from fastapi import HTTPException
-
-from domain.schemas import FilmSummary
 
 
 @pytest.mark.asyncio

@@ -29,10 +29,11 @@ def get_rental_repository() -> RentalRepository:
 
 
 def get_rental_service(
-    repository: RentalRepository = Depends(get_rental_repository)
+    repository: RentalRepository = Depends(get_rental_repository),
+    session: AsyncSession = Depends(get_db_session)
 ) -> RentalService:
     """Get rental service instance."""
-    return RentalService(repository)
+    return RentalService(repository, session)
 
 
 @router.post(
@@ -86,7 +87,6 @@ async def create_rental(
     customer_id: int = Path(..., gt=0, description="Customer ID"),
     *,
     rental_data: RentalCreate,
-    session: AsyncSession = Depends(get_db_session),
     service: RentalService = Depends(get_rental_service),
     current_user: str = Depends(get_current_user)
 ) -> RentalResponse:
@@ -127,7 +127,7 @@ async def create_rental(
     ```
     """
     print(f"Creating rental for customer {customer_id} with data {rental_data}")
-    return await service.create_rental(session, customer_id, rental_data)
+    return await service.create_rental(customer_id, rental_data)
 
 
 @router.get(
@@ -163,7 +163,6 @@ async def get_customer_rentals(
     customer_id: int = Path(..., gt=0, description="Customer ID"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
-    session: AsyncSession = Depends(get_db_session),
     service: RentalService = Depends(get_rental_service)
 ) -> List[RentalResponse]:
     """
@@ -186,7 +185,7 @@ async def get_customer_rentals(
     - Get customer 1's rentals: `GET /api/v1/customers/1/rentals`
     - Get next page: `GET /api/v1/customers/1/rentals?skip=10&limit=10`
     """
-    return await service.get_customer_rentals(session, customer_id, skip, limit)
+    return await service.get_customer_rentals(customer_id, skip, limit)
 
 
 # Additional rental endpoints for completeness - order matters!
@@ -210,7 +209,6 @@ async def get_active_rentals(
     customer_id: Optional[int] = Query(None, description="Optional customer ID filter"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
-    session: AsyncSession = Depends(get_db_session),
     service: RentalService = Depends(get_rental_service)
 ) -> List[RentalResponse]:
     """
@@ -232,7 +230,7 @@ async def get_active_rentals(
     - Filter by customer: `GET /api/v1/rentals/active?customer_id=1`
     - With pagination: `GET /api/v1/rentals/active?skip=10&limit=5`
     """
-    return await service.get_active_rentals(session, customer_id, skip, limit)
+    return await service.get_active_rentals(customer_id, skip, limit)
 
 
 @rentals_router.get(
@@ -266,7 +264,6 @@ async def get_active_rentals(
 )
 async def get_rental(
     rental_id: int = Path(..., gt=0, description="Rental ID"),
-    session: AsyncSession = Depends(get_db_session),
     service: RentalService = Depends(get_rental_service)
 ) -> RentalResponse:
     """
@@ -288,7 +285,7 @@ async def get_rental(
     **Example Usage:**
     - Get rental with ID 1: `GET /api/v1/rentals/1`
     """
-    return await service.get_rental_by_id(session, rental_id)
+    return await service.get_rental_by_id(rental_id)
 
 
 @rentals_router.put(
@@ -340,7 +337,6 @@ async def get_rental(
 )
 async def return_rental(
     rental_id: int = Path(..., gt=0, description="Rental ID to return"),
-    session: AsyncSession = Depends(get_db_session),
     service: RentalService = Depends(get_rental_service),
     current_user: str = Depends(get_current_user)
 ) -> RentalResponse:
@@ -368,4 +364,4 @@ async def return_rental(
     Authorization: Bearer dvd_admin
     ```
     """
-    return await service.return_rental(session, rental_id)
+    return await service.return_rental(rental_id)

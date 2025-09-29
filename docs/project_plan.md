@@ -238,3 +238,23 @@ resp = await kernel.invoke("summarize_tool", input=film_text, execution_settings
 - **No business logic** in migrations—use data-migration scripts if needed.
 - **No blocking I/O** in services; always await DB or network ops (asyncpg, SK).
 - **Structured logs only** (JSON) in prod; human readable in dev (structlog processors). [betterstack.com](https://betterstack.com/community/guides/logging/structlog/?utm_source=chatgpt.com)
+
+## Phase 2:
+
+### What you must add — hand-off agents
+
+| Item          | Details |
+|--------------------------|----------------------------------------|
+| Agents    | SearchAgent – examines the user’s question, fetches the first matching film title + category from Postgres, and returns a short text answer. LLMAgent – answers any other question via kernel.invoke() using the same OpenAI model you configured earlier. |
+| Orchestration                      | Build a HandoffOrchestration object (Semantic Kernel agent framework) with SearchAgent as the front-desk agent. If the question doesn’t contain the keyword "film" (or no match is found), the orchestration should automatically hand the request to LLMAgent so the user still receives a response. [learn.microsoft.com](https://learn.microsoft.com/en-us/semantic-kernel/frameworks/agent/agent-orchestration/handoff?utm_source=chatgpt.com&pivots=programming-language-python) |
+| Route                  | POST /ai/handoff body {"question": "..."} JSON response must include the selected agent: {"agent":"SearchAgent","answer":"…"} |
+| Placement | Add a new folder: text app/agents/ # Agent class + skill llm_agent.py # Agent class + skill orchestration.py # builds HandoffOrchestration. Reuse core/ai_kernel.py to inject the shared Kernel into both agents. |
+| Tests | test_handoff_search_agent – send a question that includes "film" expect "agent": "SearchAgent" in the JSON. test_handoff_llm_agent – send an unrelated question expect "agent": "LLMAgent". Use pytest-asyncio + httpx.AsyncClient to hit the real endpoint. [fastapi.tiangolo.comstackoverflow.com](https://fastapi.tiangolo.com/advanced/async-tests/?utm_source=chatgpt.com) |
+| Docs | Update README.md with example requests (see below). |
+
+### Example Requests & Responses
+
+| Scenario          | curl example | Expected JSON |
+|--------------------------|----------------------------------------|-----------------------------|
+| SearchAgent chosen | bash curl -X POST http://localhost:8000/ai/handoff \ -H "Content-Type: application/json" \ -d '{"question":"What is the rental rate for the film Alien?"}'      | json { "agent": "SearchAgent", "answer": "Alien (Horror) rents for $2.99." } |
+| LLMAgent chosen | bash curl -X POST http://localhost:8000/ai/handoff \ -H "Content-Type: application/json" \ -d '{"question":"Who won the FIFA World Cup in 2022?"}' | json { "agent": "LLMAgent", "answer": "Argentina won the 2022 FIFA World Cup after defeating France." } |

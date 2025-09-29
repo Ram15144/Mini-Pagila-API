@@ -13,6 +13,7 @@ from core.logging import (
     DatabaseLogger,
     AILogger
 )
+from core.config import settings
 
 
 def test_correlation_id_management():
@@ -71,8 +72,8 @@ def test_database_logger():
 def test_ai_logger():
     """Test AI logging utilities."""
     # Test static methods don't raise errors
-    AILogger.log_ai_request("ask_question", "gpt-4o-mini", question_length=20)
-    AILogger.log_ai_response("ask_question", "gpt-4o-mini", token_count=50)
+    AILogger.log_ai_request("ask_question", settings.OPENAI_MODEL_ID, question_length=20)
+    AILogger.log_ai_response("ask_question", settings.OPENAI_MODEL_ID, token_count=50)
     
     # Test error logging
     try:

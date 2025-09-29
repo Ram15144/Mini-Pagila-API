@@ -2,13 +2,13 @@
 
 import json
 from typing import AsyncIterator
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db_session
 from core.logging import api_logger
-from domain.schemas import FilmSummary, FilmSummaryRequest
+from domain.schemas import FilmSummary, FilmSummaryRequest, HandoffRequest, HandoffResponse
 from services.ai_service import AIService
 
 
@@ -172,3 +172,92 @@ async def summarize_film(
     result = await service.summarize_film(session, request)
     api_logger.info("Film summary completed", film_id=request.film_id, recommended=result.recommended)
     return result
+
+
+@router.post("/handoff", response_model=HandoffResponse)
+async def agent_handoff(
+    request: HandoffRequest,
+    session: AsyncSession = Depends(get_db_session),
+    service: AIService = Depends(get_ai_service)
+) -> HandoffResponse:
+    """
+    Process questions using Semantic Kernel HandoffOrchestration with intelligent agent routing.
+    
+    **Request Body:**
+    ```json
+    {
+        "question": "What is the rental rate for the film Alien?"
+    }
+    ```
+    
+    **Response:**
+    Returns structured JSON with agent identification:
+    ```json
+    {
+        "agent": "SearchAgent",
+        "answer": "Alien (Horror) rents for $2.99."
+    }
+    ```
+    
+    **Agent Selection Logic:**
+    - **SearchAgent**: Front-desk agent with film database access and function calling
+      - Handles DVD rental queries, film searches, customer rentals
+      - Has access to database functions through AgentPluginService
+      - Decides whether to handle or handoff based on system prompt
+    - **LLMAgent**: General knowledge agent for non-rental questions
+      - Handles general questions, current events, explanations
+      - Receives handoffs from SearchAgent for non-rental topics
+    
+    **Semantic Kernel Features:**
+    - Native HandoffOrchestration with OrchestrationHandoffs
+    - Agent-based decision making through system prompts
+    - Function calling with @kernel_function decorated services
+    - InProcessRuntime for agent execution management
+    
+    **Example Usage:**
+    ```bash
+    # Film-related question (handled by SearchAgent with function calling)
+    curl -X POST http://localhost:8000/api/v1/ai/handoff \
+         -H "Content-Type: application/json" \
+         -d '{"question":"What is the rental rate for the film Alien?"}'
+    
+    # General question (handed off to LLMAgent)  
+    curl -X POST http://localhost:8000/api/v1/ai/handoff \
+         -H "Content-Type: application/json" \
+         -d '{"question":"Who won the FIFA World Cup in 2022?"}'
+    ```
+    """
+    api_logger.info("Agent handoff requested", question_length=len(request.question))
+    
+    try:
+        # Process question through Semantic Kernel orchestration
+        result = await service.process_question(request.question, session)
+        
+        # Create response (confidence removed - agents decide internally)
+        response = HandoffResponse(
+            agent=result["agent"],
+            answer=result["answer"]
+        )
+        
+        api_logger.info(
+            "Agent handoff completed", 
+            agent=result["agent"],
+            question_length=len(request.question),
+            orchestration_used=result["metadata"].get("orchestration_used", False),
+            conversation_turns=result["metadata"].get("conversation_turns", 0)
+        )
+        
+        return response
+        
+    except Exception as e:
+        api_logger.error("Agent handoff failed", error=str(e), question_length=len(request.question))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process question: {str(e)}"
+        )
+    finally:
+        # Clean up orchestration service
+        try:
+            await service.cleanup()
+        except Exception as cleanup_error:
+            api_logger.warning("Orchestration cleanup failed", error=str(cleanup_error))

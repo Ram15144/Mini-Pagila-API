@@ -204,7 +204,6 @@ class RentalRepository:
         inventory_result = await session.execute(inventory_query)
         inventory_film = inventory_result.first()
 
-        print(f"Inventory film: {inventory_film}")
         if not inventory_film:
             validation_result["valid"] = False
             validation_result["errors"].append(f"Inventory item with ID {inventory_id} not found")

@@ -340,9 +340,11 @@ def test_rental_service_initialization():
     """Test rental service initialization."""
     from services.rental_service import RentalService
     from repositories.rental_repository import RentalRepository
+    from sqlalchemy.ext.asyncio import AsyncSession
     
+    session = AsyncSession()
     repository = RentalRepository()
-    service = RentalService(repository)
+    service = RentalService(repository, session)
     
     assert service.repository == repository
 

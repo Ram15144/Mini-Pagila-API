@@ -2,7 +2,7 @@
 
 from datetime import datetime, date
 from decimal import Decimal
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
 
@@ -43,7 +43,7 @@ class FilmResponse(BaseModel):
         pattern="^(G|PG|PG-13|R|NC-17)$",
         description="MPAA film rating"
     )
-    # streaming_available: bool  # Will be added in Migration #2
+    streaming_available: bool = Field(description="Whether the film is available for streaming")
     last_update: datetime = Field(description="Timestamp of last update")
 
     model_config = {
@@ -259,3 +259,22 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now())
+
+
+# Agent-related schemas
+class HandoffRequest(BaseModel):
+    """Request schema for agent handoff endpoint."""
+    question: str = Field(..., min_length=1, description="Question to process")
+    
+
+class HandoffResponse(BaseModel):
+    """Response schema for agent handoff endpoint."""
+    agent: str = Field(..., description="Agent that processed the question")
+    answer: str = Field(..., description="Agent's response")
+    # confidence removed - agents make decisions through system prompts instead of manual calculation
+    
+
+class AgentResponse(BaseModel):
+    """Base response schema for agent operations."""
+    content: str
+    metadata: Optional[Dict[str, Any]] = None

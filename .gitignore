@@ -26,6 +26,7 @@ share/python-wheels/
 *.egg
 .env.local
 __init__.py
+.DS_Store
 MANIFEST
 
 # PyInstaller

@@ -7,8 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db_session
 from domain.schemas import (
     FilmListResponse, 
-    FilmResponse, 
-    FilmQuery, 
+    FilmResponse,
     ErrorResponse, 
     ValidationErrorResponse
 )
@@ -25,10 +24,11 @@ def get_film_repository() -> FilmRepository:
 
 
 def get_film_service(
-    repository: FilmRepository = Depends(get_film_repository)
+    repository: FilmRepository = Depends(get_film_repository),
+    session: AsyncSession = Depends(get_db_session)
 ) -> FilmService:
     """Get film service instance."""
-    return FilmService(repository)
+    return FilmService(repository, session)
 
 
 @router.get(
@@ -51,7 +51,6 @@ async def list_films(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
     category: Optional[str] = Query(None, description="Filter by category name"),
-    session: AsyncSession = Depends(get_db_session),
     service: FilmService = Depends(get_film_service)
 ) -> FilmListResponse:
     """
@@ -73,8 +72,7 @@ async def list_films(
     - Get next 10 films: `GET /api/v1/films?skip=10&limit=10`
     - Filter by category: `GET /api/v1/films?category=Action`
     """
-    query = FilmQuery(skip=skip, limit=limit, category=category)
-    return await service.list_films(session, query)
+    return await service.list_films(skip, limit, category)
 
 
 @router.get(
@@ -108,7 +106,6 @@ async def list_films(
 )
 async def get_film(
     film_id: int,
-    session: AsyncSession = Depends(get_db_session),
     service: FilmService = Depends(get_film_service)
 ) -> FilmResponse:
     """
@@ -130,7 +127,7 @@ async def get_film(
     **Example Usage:**
     - Get film with ID 1: `GET /api/v1/films/1`
     """
-    return await service.get_film_by_id(session, film_id)
+    return await service.get_film_by_id(film_id)
 
 
 @router.get(
@@ -167,7 +164,6 @@ async def search_films_by_title(
     q: str = Query(..., min_length=2, description="Title search term"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
-    session: AsyncSession = Depends(get_db_session),
     service: FilmService = Depends(get_film_service)
 ) -> FilmListResponse:
     """
@@ -193,7 +189,7 @@ async def search_films_by_title(
     - Search for "academy": `GET /api/v1/films/search/title?q=academy`
     - Search with pagination: `GET /api/v1/films/search/title?q=action&skip=10&limit=5`
     """
-    return await service.search_films_by_title(session, q, skip, limit)
+    return await service.search_films_by_title(q, skip, limit)
 
 
 @router.get(
@@ -215,7 +211,6 @@ async def search_films_by_title(
 async def get_streaming_films(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
-    session: AsyncSession = Depends(get_db_session),
     service: FilmService = Depends(get_film_service)
 ) -> FilmListResponse:
     """
@@ -234,4 +229,4 @@ async def get_streaming_films(
     - Get streaming films: `GET /api/v1/films/streaming/available`
     - With pagination: `GET /api/v1/films/streaming/available?skip=10&limit=20`
     """
-    return await service.get_streaming_films(session, skip, limit)
+    return await service.get_streaming_films(skip, limit)

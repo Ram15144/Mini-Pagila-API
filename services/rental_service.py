@@ -1,8 +1,9 @@
 """Rental service for business logic operations."""
 
-from typing import List
+from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
+from semantic_kernel.functions import kernel_function
 
 from core.logging import LoggingMixin
 from domain.schemas import RentalCreate, RentalResponse
@@ -13,15 +14,15 @@ from repositories.rental_repository import RentalRepository
 class RentalService(LoggingMixin):
     """Service for rental business logic operations."""
 
-    def __init__(self, repository: RentalRepository):
+    def __init__(self, repository: RentalRepository, session: AsyncSession):
         """Initialize rental service with repository."""
         super().__init__()
         self.repository = repository
+        self.session = session
         self.logger.info("Rental service initialized")
 
     async def create_rental(
         self,
-        session: AsyncSession,
         customer_id: int,
         rental_data: RentalCreate
     ) -> RentalResponse:
@@ -60,7 +61,7 @@ class RentalService(LoggingMixin):
 
         # Validate rental data using repository
         validation_result = await self.repository.validate_rental_data(
-            session=session,
+            session=self.session,
             customer_id=customer_id,
             inventory_id=rental_data.inventory_id,
             staff_id=rental_data.staff_id
@@ -77,7 +78,7 @@ class RentalService(LoggingMixin):
         try:
             # Create the rental
             rental = await self.repository.create_rental(
-                session=session,
+                session=self.session,
                 customer_id=customer_id,
                 inventory_id=rental_data.inventory_id,
                 staff_id=rental_data.staff_id
@@ -92,16 +93,18 @@ class RentalService(LoggingMixin):
                 detail=f"Failed to create rental: {str(e)}"
             )
 
+    @kernel_function(
+        description="Get a rental by its ID",
+        name="get_rental_by_id"
+    )
     async def get_rental_by_id(
         self,
-        session: AsyncSession,
         rental_id: int
     ) -> RentalResponse:
         """
         Get a rental by its ID.
         
         Args:
-            session: Database session
             rental_id: Rental ID to retrieve
             
         Returns:
@@ -116,7 +119,7 @@ class RentalService(LoggingMixin):
                 detail="Rental ID must be positive"
             )
 
-        rental = await self.repository.get_rental_by_id(session, rental_id)
+        rental = await self.repository.get_rental_by_id(self.session, rental_id)
         
         if not rental:
             raise HTTPException(
@@ -126,9 +129,12 @@ class RentalService(LoggingMixin):
 
         return self._rental_to_response(rental)
 
+    @kernel_function(
+        description="Get all rentals for a specific customer ID with pagination",
+        name="get_customer_rentals"
+    )
     async def get_customer_rentals(
         self,
-        session: AsyncSession,
         customer_id: int,
         skip: int = 0,
         limit: int = 10
@@ -137,7 +143,6 @@ class RentalService(LoggingMixin):
         Get all rentals for a specific customer.
         
         Args:
-            session: Database session
             customer_id: Customer ID
             skip: Number of records to skip
             limit: Number of records to return
@@ -164,7 +169,7 @@ class RentalService(LoggingMixin):
             )
 
         rentals = await self.repository.get_customer_rentals(
-            session=session,
+            session=self.session,
             customer_id=customer_id,
             skip=skip,
             limit=limit
@@ -172,10 +177,13 @@ class RentalService(LoggingMixin):
 
         return [self._rental_to_response(rental) for rental in rentals]
 
+    @kernel_function(
+        description="Get all active rentals for a with optional customer ID with pagination",
+        name="get_active_rentals"
+    )
     async def get_active_rentals(
         self,
-        session: AsyncSession,
-        customer_id: int = None,
+        customer_id :Optional[int] = None,
         skip: int = 0,
         limit: int = 10
     ) -> List[RentalResponse]:
@@ -183,7 +191,6 @@ class RentalService(LoggingMixin):
         Get active rentals (not yet returned).
         
         Args:
-            session: Database session
             customer_id: Optional customer ID filter
             skip: Number of records to skip
             limit: Number of records to return
@@ -198,7 +205,7 @@ class RentalService(LoggingMixin):
             )
 
         rentals = await self.repository.get_active_rentals(
-            session=session,
+            session=self.session,
             customer_id=customer_id,
             skip=skip,
             limit=limit
@@ -208,14 +215,12 @@ class RentalService(LoggingMixin):
 
     async def return_rental(
         self,
-        session: AsyncSession,
         rental_id: int
     ) -> RentalResponse:
         """
         Return a rental.
         
         Args:
-            session: Database session
             rental_id: Rental ID to return
             
         Returns:
@@ -230,11 +235,11 @@ class RentalService(LoggingMixin):
                 detail="Rental ID must be positive"
             )
 
-        rental = await self.repository.return_rental(session, rental_id)
+        rental = await self.repository.return_rental(self.session, rental_id)
         
         if not rental:
             # Check if rental exists but is already returned
-            existing_rental = await self.repository.get_rental_by_id(session, rental_id)
+            existing_rental = await self.repository.get_rental_by_id(self.session, rental_id)
             if existing_rental:
                 if existing_rental.return_date:
                     raise HTTPException(
@@ -262,7 +267,7 @@ class RentalService(LoggingMixin):
         return RentalResponse(
             rental_id=rental.rental_id,
             rental_date=rental.rental_date,
-            inventory_id=rental.inventory_id,
+            inventory_id=int(rental.inventory_id),
             customer_id=rental.customer_id,
             return_date=rental.return_date,
             staff_id=rental.staff_id,

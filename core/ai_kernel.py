@@ -48,7 +48,7 @@ class AIKernelFactory:
         # Create OpenAI chat completion service
         try:
             chat_completion_service = OpenAIChatCompletion(
-                ai_model_id="gpt-4o-mini",
+                ai_model_id=settings.OPENAI_MODEL_ID,
                 api_key=settings.OPENAI_API_KEY,
                 service_id="openai-chat"
             )

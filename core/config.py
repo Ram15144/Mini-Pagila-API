@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     
     # OpenAI
     OPENAI_API_KEY: str = ""
+    OPENAI_MODEL_ID: str = "gpt-4o-mini"
     
     # Application
     log_level: str = "INFO"

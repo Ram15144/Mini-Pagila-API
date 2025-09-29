@@ -208,10 +208,11 @@ def test_film_service_business_logic():
     """Test film service business logic."""
     from services.film_service import FilmService
     from repositories.film_repository import FilmRepository
-    
+    from sqlalchemy.ext.asyncio import AsyncSession
+    session = AsyncSession()
     # Test service initialization
     repository = FilmRepository()
-    service = FilmService(repository)
+    service = FilmService(repository, session)
     
     assert service.repository == repository
 

@@ -10,7 +10,7 @@ This repo was created with the help of cursor IDE.
 - **🤖 AI Integration**: OpenAI GPT-4o-mini powered chat and film recommendations
 - **🔒 Authentication**: OAuth2PasswordBearer token authentication
 - **📊 Database**: PostgreSQL with enhanced Pagila schema and migrations
-- **🧪 Testing**: Comprehensive test suite with 60+ tests
+- **🧪 Testing**: Comprehensive test suite with 92+ tests
 - **📈 Logging**: Structured logging with correlation IDs and performance metrics
 - **⚡ Real-time**: Server-Sent Events (SSE) for streaming AI responses
 
@@ -42,14 +42,20 @@ pagila_api/
 ├── services/                       # Business logic layer
 │   ├── film_service.py             # Film business operations
 │   ├── rental_service.py           # Rental business operations
-│   └── ai_service.py               # AI business operations
+│   └── ai_service.py               # AI business operations with agent orchestration
 ├── repositories/                   # Data access layer
 │   ├── film_repository.py          # Film data access
 │   └── rental_repository.py        # Rental data access
+├── app/agents/                     # Agent orchestration system
+│   ├── base_agent.py               # Base agent interface
+│   ├── search_agent.py             # Film rental specialized agent
+│   └── llm_agent.py                # General knowledge agent
 ├── tests/                          # Test suite
 │   ├── test_films.py               # Film endpoint tests
 │   ├── test_rentals.py             # Rental endpoint tests
 │   ├── test_ai.py                  # AI endpoint tests
+│   ├── test_agents.py              # Agent orchestration tests
+│   ├── test_handoff_integration.py # Agent handoff integration tests
 │   ├── test_auth.py                # Authentication tests
 │   ├── test_protected_endpoint.py  # Protected Endpoint tests
 │   ├── test_models.py              # Model validation tests
@@ -129,6 +135,7 @@ curl http://localhost:8000/health
 ### 🤖 AI Endpoints
 - `GET /api/v1/ai/ask?question=` - Stream AI responses using SSE
 - `POST /api/v1/ai/summary` - Generate structured film summaries
+- `POST /api/v1/ai/handoff` - **NEW**: Intelligent agent handoff for specialized question handling
 
 ### 🩺 System Endpoints
 - `GET /health` - Health check
@@ -226,20 +233,24 @@ make docker-logs      # View Docker logs
 ## 🧪 Testing
 
 ### Test Cases Overview
-- Comprehensive coverage of all endpoints.
-- Unit Tests
+- Comprehensive coverage across 92+ tests covering all endpoints and systems.
+- **Unit Tests**
   - **Service Layer**: Business logic validation
   - **Repository Layer**: Data access operations  
   - **Model Layer**: Domain model validation
-- Integration Tests
+  - **Agent System**: Individual agent factory testing with proper mocking
+- **Integration Tests**
   - **API Endpoints**: End-to-end request/response testing
   - **Database Operations**: Real database integration
   - **AI Integration**: Live OpenAI API testing
-- Mock Testing
+  - **Agent Handoff**: Complete orchestration pipeline testing
+- **Mock Testing**
   - **External Dependencies**: Mocked for fast, reliable tests
   - **Error Scenarios**: Validation, authentication, and business logic errors
   - **Edge Cases**: Boundary condition validation
+  - **Dependency Injection**: FastAPI dependency override for proper test isolation
 - **Performance**: Response time and load testing
+- **Resource Management**: Runtime cleanup and error handling verification
 
 ### Running Tests
 ```bash
@@ -247,10 +258,12 @@ make docker-logs      # View Docker logs
 make test
 
 # Run specific test categories
-poetry run pytest tests/test_films.py -v      # Film tests
-poetry run pytest tests/test_rentals.py -v   # Rental tests  
-poetry run pytest tests/test_ai.py -v        # AI tests
-poetry run pytest tests/test_auth.py -v      # Auth tests
+poetry run pytest tests/test_films.py -v             # Film tests
+poetry run pytest tests/test_rentals.py -v           # Rental tests  
+poetry run pytest tests/test_ai.py -v                # AI tests
+poetry run pytest tests/test_agents.py -v            # Agent orchestration tests
+poetry run pytest tests/test_handoff_integration.py -v # Agent handoff tests
+poetry run pytest tests/test_auth.py -v              # Auth tests
 
 # With coverage
 make test-coverage
@@ -264,6 +277,9 @@ If conda env is activated and there are some import errors when running tests us
 - **✅ Authentication**: Token validation and security
 - **✅ Business Logic**: Rental rules and film recommendations
 - **✅ AI Integration**: Real OpenAI API testing
+- **✅ Agent Orchestration**: Complete handoff system testing with mocking
+- **✅ Resource Management**: Runtime cleanup and lifecycle testing
+- **✅ Error Handling**: Comprehensive error scenarios and fallback testing
 - **✅ Performance**: Response time validation
 
 ## 🤖 AI Features
@@ -275,6 +291,52 @@ Powered by Microsoft Semantic Kernel with OpenAI GPT-4o-mini:
 - **Film Recommendations**: Smart recommendations based on rating and price
 - **Structured Responses**: JSON-formatted film summaries
 - **Business Logic**: Recommends films with mature rating (R/NC-17) and rental_rate < $3.00
+- **Agent Handoff**: Intelligent routing between specialized agents using native HandoffOrchestration
+
+### Agent Handoff System
+Two-agent system with intelligent question routing:
+
+#### 🔍 SearchAgent
+- **Specialization**: DVD rental store queries and film database operations
+- **Capabilities**: 
+  - Film searches by title with database integration
+  - Rental rate and availability information
+  - Customer rental history lookup
+  - Streaming film recommendations
+- **Function Calling**: Direct database access through @kernel_function decorated services
+- **Decision Making**: Uses system prompts to determine if question requires database access
+- **Factory Pattern**: `SearchAgentFactory.create_search_agent()` for consistent agent creation
+
+#### 🧠 LLMAgent  
+- **Specialization**: General knowledge and non-rental questions
+- **Capabilities**:
+  - Science, history, and current events
+  - Math problems and calculations
+  - Educational support and explanations
+  - Creative tasks and brainstorming
+- **Handoff Logic**: Receives questions from SearchAgent when outside rental domain
+- **Factory Pattern**: `LLMAgentFactory.create_llm_agent()` for consistent agent creation
+
+#### 🔄 HandoffOrchestration & Runtime Management
+- **Framework**: Native Semantic Kernel HandoffOrchestration with OrchestrationHandoffs
+- **Runtime**: InProcessRuntime for agent execution management with automatic cleanup
+- **Decision Making**: Agent-based routing through intelligent system prompts (no manual confidence calculation)
+- **Front-desk Pattern**: SearchAgent serves as initial handler, deciding whether to process or handoff
+- **Resource Management**: Automatic runtime lifecycle with proper cleanup in finally blocks
+- **Error Handling**: Comprehensive error handling with fallback responses and cleanup
+
+#### 🏭 Agent Architecture
+- **Base Agent**: Abstract base class for consistent agent interfaces
+- **Service Integration**: Plugins provide database access through Semantic Kernel function calling
+- **Session Management**: Proper database session handling for agent operations
+- **Logging Integration**: Structured logging throughout the orchestration pipeline
+
+#### 🧪 Comprehensive Testing
+- **Unit Tests**: Individual agent factory and method testing with mocking
+- **Integration Tests**: End-to-end handoff orchestration testing
+- **Error Scenarios**: Comprehensive error handling and cleanup verification
+- **Mocking Strategy**: FastAPI dependency override for reliable test isolation
+- **Edge Cases**: Validation testing, timeout handling, and resource cleanup
 
 ### AI Endpoints
 
@@ -290,6 +352,19 @@ curl -H "Accept: text/event-stream" \
 curl -X POST http://localhost:8000/api/v1/ai/summary \
      -H "Content-Type: application/json" \
      -d '{"film_id": 1}'
+```
+
+#### Agent Handoff (NEW)
+```bash
+# Film-related question (handled by SearchAgent with database access)
+curl -X POST http://localhost:8000/api/v1/ai/handoff \
+     -H "Content-Type: application/json" \
+     -d '{"question":"What is the rental rate for the film Alien?"}'
+
+# General question (handled by LLMAgent)
+curl -X POST http://localhost:8000/api/v1/ai/handoff \
+     -H "Content-Type: application/json" \
+     -d '{"question":"Who won the FIFA World Cup in 2022?"}'
 ```
 
 ## 📊 Logging & Observability
@@ -322,14 +397,15 @@ Built-in structured logging with:
 - **Core Layer** (`core/`): Infrastructure (auth, database, AI, logging)
 
 ### Technology Stack
-- **FastAPI**: Modern async web framework
+- **FastAPI**: Modern async web framework with dependency injection
 - **SQLModel**: Type-safe ORM with async support
 - **PostgreSQL**: Robust relational database
-- **Semantic Kernel**: Microsoft's AI orchestration framework
+- **Semantic Kernel**: Microsoft's AI orchestration framework with HandoffOrchestration
 - **OpenAI**: GPT-4o-mini for chat and summaries
 - **Structlog**: Structured logging for observability
 - **Poetry**: Dependency management
-- **pytest**: Comprehensive testing framework
+- **pytest**: Comprehensive testing framework with FastAPI test client
+- **Mock/AsyncMock**: Advanced mocking for agent orchestration testing
 
 ## 🐳 Docker Support
 
@@ -363,6 +439,7 @@ docker-compose down
 - **Rental Creation**: ~100ms with validation
 - **AI Chat (SSE)**: ~2-5s depending on response length
 - **AI Summary**: ~1-3s with OpenAI processing
+- **Agent Handoff**: ~2-4s with intelligent routing and database integration
 
 ### Optimization Features
 - **Database Indexing**: Optimized queries with proper joins
